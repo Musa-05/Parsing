@@ -1,8 +1,11 @@
 import requests
 from bs4 import BeautifulSoup
+
+import datetime
 import time
 import csv
 import random
+import json
 
 headers = {
     'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
@@ -10,57 +13,107 @@ headers = {
 }
 
 
-def get_urls_data(url):
-    # r = requests.get(url=url, headers=headers)
-    # with open('index.html', 'w', encoding='utf-8') as file:
-    #     file.write(r.text)
-    # with open('index.html', encoding='utf-8') as file:
-    #     src = file.read()
-    #
-    # soup = BeautifulSoup(src, 'lxml')
-    # main_headings = soup.find('div', class_='maincategories')
-    # main_urls = main_headings.find_all('div', class_='li fleft')
-    # main_urls_list = []
-    # for item in main_urls:
-    #     main_url = item.find('a').get('href')
-    #     main_urls_list.append(main_url)
+def get_urls(url):
+    r = requests.get(url=url, headers=headers)
+    soup = BeautifulSoup(r.text, 'lxml')
+    page_coutn = int(soup.find('div', class_='pager').find_all('span', class_='item')[-1].text.strip())
 
-    # for main_url in main_urls_list[:1]:
-    #     r = requests.get(url=main_url, headers=headers)
-    #     soup = BeautifulSoup(r.text, 'lxml')
-    #     rubrika_urls = soup.find('div', class_='toplinks').find('div', class_='inner').find_all('ul')
-    #
-    #
-    #     urls_rubrik = []
-    #     for rubrika in rubrika_urls:
-    #         #url_rubrik = rubrika.find('a').get('href')
-    #         try:
-    #             urls_rubrik1 = rubrika.find_all('li', class_='visible')[0].find('a').get('href')
-    #             urls_rubrik2 = rubrika.find_all('li', class_='visible')[1].find('a').get('href')
-    #             urls_rubrik.append(urls_rubrik1)
-    #             urls_rubrik.append(urls_rubrik2)
-    #         except:
-    #             urls_rubrik = 'no'
-    #
-    #     for url in urls_rubrik[:1]:
-    #         r = requests.get(url=url, headers=headers)
-    #         with open('index2.html', 'w', encoding='utf-8') as file:
-    #             file.write(r.text)
+    item_urls_list = []
+    for i in range(1, page_coutn + 1):
+        r = requests.get(f'https://www.olx.ua/detskiy-mir/?page={i}', headers=headers)
+        time.sleep(random.randrange(2, 5))
+        soup = BeautifulSoup(r.text, 'lxml')
+        items = soup.find('table', class_='fixed offers breakword redesigned').find_all('tr')
 
-    with open('../PythonProect/lesson_8/index2.html', encoding='utf-8') as file:
-        src = file.read()
+        for item in items:
+            try:
+                item_url = item.find('td').find('a', class_='marginright5').get('href')
 
-    soup = BeautifulSoup(src, 'lxml')
-    all_block = soup.find('table', class_='fixed offers breakword redesigned').find('tbody').find_all('tr', class_='wrap')
-    for item in all_block:
-        item_url = item.find('td', class_='photo-cell').find('a').get('href')
+            except Exception as ex:
+                continue
+            item_urls_list.append(item_url)
+
+        print(i)
+    with open('item_urls_list.txt', 'w', encoding='utf-8') as file:
+        for url in item_urls_list:
+            file.write(url + '\n')
 
 
-        print(item_url)
+def get_data(file_path):
+    cur_time = datetime.datetime.now().strftime('%d_%m_%Y_%H_%M')
+    with open(f'labirint_{cur_time}.csv', 'w', encoding='cp1251', newline='') as file:
+        writer = csv.writer(file, delimiter=";")
+
+        writer.writerow(
+            (
+                'Ссылка',
+                'Дата публикации',
+                'Заголовок',
+                'Цена',
+                'Имя'
+            )
+        )
+
+    with open(file_path, encoding='utf-8') as file:
+        urls_list = [line.strip() for line in file.readlines()]
+
+    result_data = []
+    count = 0
+    for url in urls_list:
+        r = requests.get(url=url, headers=headers)
+        time.sleep(random.randrange(2, 5))
+        soup = BeautifulSoup(r.text, 'lxml')
+
+        try:
+            data_publication = soup.find('span', class_='css-ubdo89-Text').find('span',
+                                                                                class_='css-19yf5ek').text.strip()
+        except:
+            data_publication = 'Нет даты'
+        try:
+            title_publication = soup.find('h1').text
+        except:
+            title_publication = 'Нет заголовка'
+        try:
+            price_publication = soup.find('div', class_='css-dcwlyx').text.strip().replace('\"', '')
+        except:
+            price_publication = 'Нет цены'
+        try:
+            name_publication = soup.find('h2').text.strip()
+        except:
+            name_publication = 'Имя не указана'
+
+        result_data.append(
+            {
+                'url': url,
+                'data_publication': data_publication,
+                'title_publication': title_publication,
+                'price_publication': price_publication,
+                'name_publication': name_publication,
+
+            }
+        )
+        with open(f'labirint_{cur_time}.csv', 'a', encoding='cp1251', newline='') as file:
+            writer = csv.writer(file, delimiter=';')
+
+            writer.writerow(
+                (
+                    url,
+                    data_publication,
+                    title_publication,
+                    price_publication,
+                    name_publication
+                )
+            )
+
+    count += 1
+    print(count)
+    with open(f'result_data_{cur_time}.json', 'w', encoding='utf-8') as file:
+        json.dump(result_data, file, indent=4, ensure_ascii=False)
 
 
 def main():
-    get_urls_data('https://www.olx.ua/')
+    get_urls('https://www.olx.ua/detskiy-mir/')
+    get_data(file_path='item_urls_list.txt')
 
 
 if __name__ == '__main__':
