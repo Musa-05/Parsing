@@ -47,6 +47,8 @@ ROWS = 5
 # для чтения ВВЕРХ столбц (например, -1 2 -3 4) :
 
 key = """-1, 2 -3, 4"""
+
+
 # КОНЕЦ ВХОДНЫХ ДАННЫХ ПОЛЬЗОВАТЕЛЯ - НЕ РЕДАКТИРОВАТЬ НИЖЕ
 # ЭТОЙ СТРОКИ!
 # = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -68,3 +70,63 @@ def main():
 
     print(f'Открытый текст = {plaintext}')
 
+
+def validate_col_row(cipherlist):
+    """Проверить, что входные столбцы и строки приемлемы
+    по отношению к длине сообщения."""
+    factors = []
+    len_cipher = len(cipherlist)
+    for i in range(2, len_cipher):  # диапазон исключает 1 столбец шифров
+        if len_cipher % i == 0:
+            factors.append(i)
+    print(f'Длина шифра = {len_cipher}')
+    print(f'Приемлемые значения столбцов/строк включают: {factors}')
+    print()
+    if ROWS * COLS != len_cipher:
+        print(f'Ошибка - входные столбцы и строки не являются кратными длины шифра. Завершение программы.',
+              file=sys.stderr)
+        sys.exit(1)
+
+
+def key_to_int(key):
+    """Превратить ключ в список целых чисел и проверить допустимость."""
+    key_int = [int(i) for i in key.split()]
+    key_int_lo = min(key_int)
+    key_int_hi = max(key_int)
+    if len(key_int) != COLS or key_int_lo < -COLS or key_int_hi > COLS or 0 in key_int:
+        print(f'Ошибка - проблема с ключом. Завершение.', file=sys.stderr)
+        sys.exit(1)
+    else:
+        return key_int
+
+
+def build_matrix(key_int, cipherlist):
+    """Превратить каждые п элементов в списке в новый элемент
+    в списке списков."""
+    translation_matrix = [None] * COLS
+    start = 0
+    stop = ROWS
+    for k in key_int:
+        if k < 0:  # читать в столбце снизу-вверх
+            col_items = cipherlist[start:stop]
+        elif k > 0:  # читать в столбце сверху-вних
+            col_items = list((reversed(cipherlist[start:stop])))
+        translation_matrix[abs(k) - 1] = col_items
+        start += ROWS
+        stop += ROWS
+    return translation_matrix
+
+
+def decrypt(translation_matrix):
+    """Перебрать вложенные списки в цикле, выталкивая последний элемент
+    в символьную цепочку."""
+    plaintext = ''
+    for i in range(ROWS):
+        for matrix_col in translation_matrix:
+            word = str(matrix_col.pop())
+            plaintext += word + ' '
+    return plaintext
+
+
+if __name__ == '__main__':
+    main()
